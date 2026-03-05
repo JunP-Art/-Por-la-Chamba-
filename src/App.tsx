@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Fuel, Timer, Gauge, Trophy, RotateCcw, Play, Home } from 'lucide-react';
+import { Fuel, Timer, Gauge, Trophy, RotateCcw, Play, Home, Maximize } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -63,6 +63,50 @@ export default function App() {
   const [distance, setDistance] = useState(0);
   const [showCode, setShowCode] = useState(false);
   const [codeTab, setCodeTab] = useState<'HTML' | 'CSS'>('HTML');
+  const [scale, setScale] = useState(1);
+
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.log(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
+  const handlePointerDown = (key: string) => (e: React.PointerEvent | React.TouchEvent) => {
+    e.preventDefault();
+    if (key in stateRef.current.keys) {
+      stateRef.current.keys[key as keyof typeof stateRef.current.keys] = true;
+    }
+  };
+
+  const handlePointerUp = (key: string) => (e: React.PointerEvent | React.TouchEvent) => {
+    e.preventDefault();
+    if (key in stateRef.current.keys) {
+      stateRef.current.keys[key as keyof typeof stateRef.current.keys] = false;
+    }
+  };
+
+  useEffect(() => {
+    const updateScale = () => {
+      const isPortrait = window.innerHeight > window.innerWidth;
+      const availableWidth = window.innerWidth;
+      const availableHeight = isPortrait ? window.innerHeight - 160 : window.innerHeight;
+      
+      const scaleX = availableWidth / CANVAS_WIDTH;
+      const scaleY = availableHeight / CANVAS_HEIGHT;
+      
+      setScale(Math.min(1, scaleX, scaleY));
+    };
+    
+    window.addEventListener('resize', updateScale);
+    updateScale();
+    return () => window.removeEventListener('resize', updateScale);
+  }, []);
   
   // Game refs for high-frequency updates
   const stateRef = useRef({
@@ -460,16 +504,39 @@ export default function App() {
   }, [gameState]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white font-sans flex flex-col items-center justify-center p-4 overflow-hidden">
-      <div className="flex flex-col lg:flex-row gap-8 items-stretch">
+    <div className="min-h-screen bg-zinc-950 text-white font-sans flex flex-col items-center justify-center p-0 lg:p-4 overflow-hidden touch-none">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-center lg:items-stretch w-full max-w-6xl mx-auto">
         {/* Main Game Container */}
-        <div className="relative group">
+        <div className="relative group flex flex-col items-center">
           {/* Decorative Borders */}
-          <div className="absolute -inset-1 bg-gradient-to-b from-blue-500 to-emerald-500 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+          <div className="hidden lg:block absolute -inset-1 bg-gradient-to-b from-blue-500 to-emerald-500 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
           
-          <div className="relative bg-zinc-900 rounded-lg overflow-hidden border border-white/10 shadow-2xl w-[400px] h-[600px]">
-            {/* DOM-based Game World */}
-            <div className="absolute inset-0 bg-[#2d5a27] overflow-hidden">
+          <div 
+            className="relative bg-zinc-900 lg:rounded-lg overflow-hidden border-y lg:border border-white/10 shadow-2xl"
+            style={{ 
+              width: CANVAS_WIDTH * scale, 
+              height: CANVAS_HEIGHT * scale 
+            }}
+          >
+            <div 
+              style={{ 
+                width: CANVAS_WIDTH, 
+                height: CANVAS_HEIGHT, 
+                transform: `scale(${scale})`, 
+                transformOrigin: 'top left' 
+              }}
+              className="absolute top-0 left-0"
+            >
+              {/* Fullscreen Button */}
+              <button
+                onClick={toggleFullScreen}
+                className="absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white/70 hover:text-white transition-colors border border-white/10"
+              >
+                <Maximize size={16} />
+              </button>
+
+              {/* DOM-based Game World */}
+              <div className="absolute inset-0 bg-[#2d5a27] overflow-hidden">
               {/* Road Segments */}
               {stateRef.current.roadHistory.map((offset, i) => {
                 const y = i * 10;
@@ -766,6 +833,49 @@ export default function App() {
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+          </div>
+
+          {/* Mobile Controls */}
+          <div className="lg:hidden flex flex-col gap-4 w-full max-w-[400px] mt-2 select-none">
+            <div className="flex justify-between px-4">
+              <div className="flex gap-2">
+                <button 
+                  className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center active:bg-zinc-700 border border-white/10 shadow-lg"
+                  onPointerDown={handlePointerDown('a')}
+                  onPointerUp={handlePointerUp('a')}
+                  onPointerLeave={handlePointerUp('a')}
+                >
+                  <span className="text-2xl font-bold">←</span>
+                </button>
+                <button 
+                  className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center active:bg-zinc-700 border border-white/10 shadow-lg"
+                  onPointerDown={handlePointerDown('d')}
+                  onPointerUp={handlePointerUp('d')}
+                  onPointerLeave={handlePointerUp('d')}
+                >
+                  <span className="text-2xl font-bold">→</span>
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  className="w-16 h-16 bg-red-900/50 rounded-full flex items-center justify-center active:bg-red-800/50 border border-red-500/30 shadow-lg"
+                  onPointerDown={handlePointerDown('s')}
+                  onPointerUp={handlePointerUp('s')}
+                  onPointerLeave={handlePointerUp('s')}
+                >
+                  <span className="text-xs font-bold uppercase tracking-wider">Brake</span>
+                </button>
+                <button 
+                  className="w-16 h-16 bg-emerald-900/50 rounded-full flex items-center justify-center active:bg-emerald-800/50 border border-emerald-500/30 shadow-lg"
+                  onPointerDown={handlePointerDown('w')}
+                  onPointerUp={handlePointerUp('w')}
+                  onPointerLeave={handlePointerUp('w')}
+                >
+                  <span className="text-xs font-bold uppercase tracking-wider">Gas</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
